@@ -126,7 +126,7 @@ export function ReactionModal({ gameState, myPlayerId, onSend }: ReactionModalPr
             </button>
           ))}
 
-          {isBlockPhase && !isMyTurn && (
+          {isBlockPhase && !isBlocker && (
             <button
               onClick={() => onSend({ type: 'challenge' })}
               className="w-full py-2.5 rounded-xl border border-orange-700 bg-orange-900/20 hover:bg-orange-900/40 text-orange-300 font-semibold transition-colors"

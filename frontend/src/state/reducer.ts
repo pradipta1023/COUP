@@ -34,6 +34,10 @@ export function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, screen: 'GAME', gameState: action.gameState, error: null }
 
     case 'GAME_STATE':
+      // If the server embedded a winner in the game state, transition to END_GAME
+      if (action.gameState.winnerId) {
+        return { ...state, screen: 'END_GAME', gameState: action.gameState }
+      }
       return { ...state, gameState: action.gameState }
 
     case 'GAME_OVER': {

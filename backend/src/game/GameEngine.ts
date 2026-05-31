@@ -1,6 +1,6 @@
 import type { ActionType, CardName, ClientCard, ClientGameState, ClientPlayer } from '@shared/types.ts';
 import { buildDeck, drawCard, returnAndShuffle, shuffle } from './Deck.ts';
-import type { GameEvent, ServerCard, ServerGameState, ServerPlayer, ServerTurnState } from './types.ts';
+import type { GameEvent, RevealReason, ServerCard, ServerGameState, ServerPlayer, ServerTurnState } from './types.ts';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -228,12 +228,12 @@ function applyInstantAction(
   }
   if (action === 'coup') {
     const updatedState = updateCoins(state, player.id, -7);
-    // Target must reveal a card — handled by the reaction system
     return {
       ...updatedState,
       turnState: {
         ...updatedState.turnState,
         phase: 'waiting_for_reveal',
+        revealReason: 'coup' as RevealReason,
         revealingPlayerId: targetPlayerId,
         pendingAction: 'coup',
         targetPlayerId,
@@ -301,46 +301,43 @@ export function applyChallenge(
 
     let newState: ServerGameState = { ...state, players: updatedPlayers, deck: newDeck };
 
-    // Challenger must now reveal a card
+    // Challenger must reveal a card; after they do, the original action either
+    // continues (action challenge) or is cancelled (block challenge).
+    const revealReason: RevealReason = isBlockChallenge
+      ? 'challenge_won_action' // block stood → action cancelled after challenger reveals
+      : 'challenge_fail_action'; // action continues after challenger reveals
+
     newState = {
       ...newState,
       turnState: {
         ...newState.turnState,
         phase: 'waiting_for_reveal',
+        revealReason,
         revealingPlayerId: challengerId,
       },
     };
 
     return { state: { ...newState, actionLog: [...newState.actionLog, ...events] }, events };
   } else {
-    // Claimer loses influence (challenge succeeds)
+    // Claimer loses influence (challenge succeeds) — let the claimer CHOOSE which card to reveal
     events.push(makeEvent(`${claimingPlayer.name} cannot prove ${claimedRole} — challenge succeeds`, 'result'));
 
-    if (isBlockChallenge) {
-      // Block is busted → the original action proceeds
-      const unrevealedIndex = claimingPlayer.cards.findIndex((c) => !c.revealed);
-      const { state: afterReveal, events: revealEvents } = revealCard(state, claimedById, unrevealedIndex);
-      events.push(...revealEvents);
+    const revealReason: RevealReason = isBlockChallenge
+      ? 'challenge_won_block'  // block busted → original action proceeds after claimer reveals
+      : 'challenge_won_action'; // action busted → turn advances after claimer reveals
 
-      let newState = afterReveal;
-      newState = checkWin(newState);
-      if (newState.turnState.phase !== 'game_over') {
-        newState = resolveAction(newState, events);
-      }
-      return { state: { ...newState, actionLog: [...newState.actionLog, ...events] }, events };
-    } else {
-      // Original action is busted → claimer loses influence; action is cancelled
-      const unrevealedIndex = claimingPlayer.cards.findIndex((c) => !c.revealed);
-      const { state: afterReveal, events: revealEvents } = revealCard(state, claimedById, unrevealedIndex);
-      events.push(...revealEvents);
+    const newState: ServerGameState = {
+      ...state,
+      turnState: {
+        ...state.turnState,
+        phase: 'waiting_for_reveal',
+        revealReason,
+        revealingPlayerId: claimedById,
+      },
+      actionLog: [...state.actionLog, ...events],
+    };
 
-      let newState = afterReveal;
-      newState = checkWin(newState);
-      if (newState.turnState.phase !== 'game_over') {
-        newState = advanceTurn(newState);
-      }
-      return { state: { ...newState, actionLog: [...newState.actionLog, ...events] }, events };
-    }
+    return { state: newState, events };
   }
 }
 
@@ -467,6 +464,7 @@ function resolveAction(state: ServerGameState, events: GameEvent[]): ServerGameS
         turnState: {
           ...s.turnState,
           phase: 'waiting_for_reveal',
+          revealReason: 'assassinate' as RevealReason,
           revealingPlayerId: targetId,
         },
       };
@@ -506,11 +504,18 @@ export function applyReveal(
   if (state.turnState.phase !== 'waiting_for_reveal') throw new Error('Not in reveal phase');
   if (state.turnState.revealingPlayerId !== playerId) throw new Error('Not your reveal');
 
+  const reason = state.turnState.revealReason;
   const { state: afterReveal, events } = revealCard(state, playerId, cardIndex);
   let newState = checkWin(afterReveal);
 
   if (newState.turnState.phase !== 'game_over') {
-    newState = advanceTurn(newState);
+    if (reason === 'challenge_fail_action' || reason === 'challenge_won_block') {
+      // Original action must now execute
+      newState = resolveAction(newState, events);
+    } else {
+      // coup, assassinate, challenge_won_action — just advance turn
+      newState = advanceTurn(newState);
+    }
   }
 
   return { state: { ...newState, actionLog: [...newState.actionLog, ...events] }, events };

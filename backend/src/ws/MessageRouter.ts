@@ -129,12 +129,21 @@ function handleTakeAction(
   if (needsReaction) startReactionWindow(room);
 }
 
+/** Broadcast game state and, if there's a winner, also send game_over. */
+function broadcastState(room: Room): void {
+  const state = room.gameState!;
+  if (state.winnerId) {
+    room.broadcast({ type: 'game_over', winnerId: state.winnerId, winnerName: state.winnerName });
+  }
+  room.broadcastGameState();
+}
+
 function handleChallenge(room: Room, playerId: string): void {
   if (!room.gameState) throw new Error('Game not started');
   clearWindow(room.code);
   const { state } = applyChallenge(room.gameState, playerId);
   room.gameState = state;
-  room.broadcastGameState();
+  broadcastState(room);
 }
 
 function handleBlock(
@@ -155,17 +164,14 @@ function handlePass(room: Room, playerId: string): void {
   const { state, actionResolved } = applyPass(room.gameState, playerId);
   room.gameState = state;
   if (actionResolved) clearWindow(room.code);
-  room.broadcastGameState();
+  broadcastState(room);
 }
 
 function handleReveal(room: Room, playerId: string, cardIndex: number): void {
   if (!room.gameState) throw new Error('Game not started');
   const { state } = applyReveal(room.gameState, playerId, cardIndex);
   room.gameState = state;
-  if (state.winnerId) {
-    room.broadcast({ type: 'game_over', winnerId: state.winnerId, winnerName: state.winnerName });
-  }
-  room.broadcastGameState();
+  broadcastState(room);
 }
 
 function handleExchange(

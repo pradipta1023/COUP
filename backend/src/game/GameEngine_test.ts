@@ -245,46 +245,52 @@ Deno.test('applyExchange replaces cards and advances turn', () => {
 
 // ─── Challenge resolution ─────────────────────────────────────────────────────
 
-Deno.test('successful challenge (claimer lied): claimer loses influence, action cancelled', () => {
+Deno.test('successful challenge (claimer lied): game enters waiting_for_reveal for claimer', () => {
   let state = initGame(twoPlayers());
-  // p1 claims Duke but has no Duke
   state = forceCards(state, 'p1', ['Assassin', 'Contessa']);
-  const { state: s2 } = declareAction(state, 'p1', 'tax'); // claims Duke
+  const { state: s2 } = declareAction(state, 'p1', 'tax'); // claims Duke but has none
   const { state: s3, events } = applyChallenge(s2, 'p2');
-  // p1 can't prove Duke → loses a card
-  const p1 = s3.players.find((p) => p.id === 'p1')!;
-  assertEquals(p1.cards.some((c) => c.revealed), true);
+  // Game waits for p1 to choose which card to reveal
+  assertEquals(s3.turnState.phase, 'waiting_for_reveal');
+  assertEquals(s3.turnState.revealingPlayerId, 'p1');
   assertEquals(events.some((e) => e.message.includes('challenge succeeds')), true);
+  // After p1 reveals, turn advances (action was cancelled)
+  const { state: s4 } = applyReveal(s3, 'p1', 0);
+  assertEquals(s4.players.find((p) => p.id === 'p1')!.cards[0].revealed, true);
+  assertEquals(s4.turnState.currentPlayerId, 'p2');
 });
 
-Deno.test('failed challenge (claimer told truth): game enters waiting_for_reveal for challenger', () => {
+Deno.test('failed challenge (claimer told truth): challenger reveals then original action executes', () => {
   let state = initGame(twoPlayers());
-  // p1 genuinely has Duke
-  state = forceCards(state, 'p1', ['Duke', 'Contessa']);
+  state = forceCards(state, 'p1', ['Duke', 'Contessa']); // p1 genuinely has Duke
   const { state: s2 } = declareAction(state, 'p1', 'tax');
   const { state: s3, events } = applyChallenge(s2, 'p2');
-  // Challenge fails → p2 must reveal a card (waiting_for_reveal phase)
+  // Challenge fails → p2 must reveal
   assertEquals(s3.turnState.phase, 'waiting_for_reveal');
   assertEquals(s3.turnState.revealingPlayerId, 'p2');
   assertEquals(events.some((e) => e.message.includes('challenge fails')), true);
-  // After p2 reveals, they lose one card
+  // After p2 reveals, Tax executes (p1 gets +3 coins) and turn advances
   const { state: s4 } = applyReveal(s3, 'p2', 0);
-  const p2 = s4.players.find((p) => p.id === 'p2')!;
-  assertEquals(p2.cards.filter((c) => c.revealed).length, 1);
+  assertEquals(s4.players.find((p) => p.id === 'p1')!.coins, 5); // 2 + 3
+  assertEquals(s4.turnState.currentPlayerId, 'p2');
 });
 
 // ─── Block challenge ──────────────────────────────────────────────────────────
 
-Deno.test('block challenge: block is false, action proceeds', () => {
+Deno.test('block challenge: block is false, game enters waiting_for_reveal then action proceeds', () => {
   let state = initGame(twoPlayers());
-  // p2 claims Duke to block foreign aid, but has no Duke
-  state = forceCards(state, 'p2', ['Contessa', 'Captain']);
+  state = forceCards(state, 'p2', ['Contessa', 'Captain']); // p2 has no Duke
   const { state: s2 } = declareAction(state, 'p1', 'foreign_aid');
   const { state: s3 } = applyBlock(s2, 'p2', 'Duke');
   const { state: s4, events } = applyChallenge(s3, 'p1');
-  // Block busted → foreign aid proceeds → p1 gets +2 coins
-  assertEquals(s4.players.find((p) => p.id === 'p1')!.coins, 4);
+  // Block busted — p2 must choose which card to reveal
+  assertEquals(s4.turnState.phase, 'waiting_for_reveal');
+  assertEquals(s4.turnState.revealingPlayerId, 'p2');
   assertEquals(events.some((e) => e.message.includes('challenge succeeds')), true);
+  // After p2 reveals, foreign aid proceeds — p1 gets +2 coins
+  const { state: s5 } = applyReveal(s4, 'p2', 0);
+  assertEquals(s5.players.find((p) => p.id === 'p1')!.coins, 4);
+  assertEquals(s5.turnState.currentPlayerId, 'p2'); // turn advanced after
 });
 
 // ─── Win condition ────────────────────────────────────────────────────────────

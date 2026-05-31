@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { roomManager } from './src/rooms/RoomManager.ts';
+import { handleWsUpgrade } from './src/ws/ConnectionManager.ts';
 
 const app = new Hono();
 
@@ -25,6 +26,8 @@ app.get('/rooms/:code', (c) => {
   if (!room) return c.json({ error: 'Room not found' }, 404);
   return c.json(room.toRoomState());
 });
+
+app.get('/ws/:roomCode/:playerId', handleWsUpgrade);
 
 const port = parseInt(Deno.env.get('PORT') ?? '8000');
 console.log(`Backend listening on http://localhost:${port}`);

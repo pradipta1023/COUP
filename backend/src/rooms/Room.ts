@@ -1,4 +1,6 @@
 import type { LobbyPlayer, RoomState } from '@shared/types.ts';
+import type { ServerGameState } from '../game/types.ts';
+import { toClientGameState } from '../game/GameEngine.ts';
 
 export interface RoomPlayer {
   id: string;
@@ -12,6 +14,8 @@ export class Room {
   private players: Map<string, RoomPlayer> = new Map();
   private hostId: string;
   inGame = false;
+  gameState: ServerGameState | null = null;
+  reconnectTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
   constructor(code: string, hostId: string, hostName: string) {
     this.code = code;
@@ -97,6 +101,17 @@ export class Room {
     const player = this.players.get(playerId);
     if (player?.socket?.readyState === WebSocket.OPEN) {
       player.socket.send(JSON.stringify(message));
+    }
+  }
+
+  /** Sends personalised game state to every connected player. */
+  broadcastGameState(msgType: 'game_started' | 'game_state' = 'game_state'): void {
+    if (!this.gameState) return;
+    for (const player of this.players.values()) {
+      if (player.socket?.readyState === WebSocket.OPEN) {
+        const clientState = toClientGameState(this.gameState, player.id);
+        player.socket.send(JSON.stringify({ type: msgType, gameState: clientState }));
+      }
     }
   }
 }

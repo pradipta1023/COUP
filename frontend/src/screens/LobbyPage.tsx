@@ -6,8 +6,10 @@ import { ChatPanel } from '../components/ChatPanel'
 import { WsIndicator } from '../components/WsIndicator'
 
 interface LobbyPageProps {
-  roomState: RoomState | null
+  roomCode: string           // available immediately from app state
   myPlayerId: string
+  myPlayerName: string       // available immediately from app state
+  roomState: RoomState | null
   chatMessages: ChatMessage[]
   wsStatus: WsStatus
   onSendMessage: (msg: ClientMessage) => void
@@ -15,25 +17,27 @@ interface LobbyPageProps {
 }
 
 export function LobbyPage({
-  roomState,
+  roomCode,
   myPlayerId,
+  myPlayerName,
+  roomState,
   chatMessages,
   wsStatus,
   onSendMessage,
   onLeave,
 }: LobbyPageProps) {
-  const isHost = roomState?.hostPlayerId === myPlayerId
-  const playerCount = roomState?.players.length ?? 0
+  const isHost = roomState ? roomState.hostPlayerId === myPlayerId : true
+  const playerCount = roomState?.players.length ?? 1  // at least us
   const canStart = isHost && playerCount >= 2
 
   const handleStart = () => onSendMessage({ type: 'start_game' })
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
-      {/* Top bar */}
+      {/* Top bar — always shows room code from immediate state */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
         <h1 className="text-xl font-black tracking-widest text-amber-400 uppercase">COUP</h1>
-        {roomState && <RoomCode code={roomState.roomCode} />}
+        <RoomCode code={roomCode} />
         <WsIndicator status={wsStatus} />
       </header>
 
@@ -49,7 +53,19 @@ export function LobbyPage({
             {roomState ? (
               <PlayerList players={roomState.players} myPlayerId={myPlayerId} />
             ) : (
-              <p className="text-gray-600 text-sm">Connecting…</p>
+              /* Show self immediately while WS connects */
+              <ul className="space-y-2">
+                <li className="flex items-center gap-3 px-4 py-2 rounded-lg border border-gray-700 bg-gray-800/60">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
+                  <span className="flex-1 text-gray-100 font-medium">
+                    {myPlayerName}
+                    <span className="ml-2 text-xs text-gray-500">(you)</span>
+                  </span>
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded bg-amber-900/60 text-amber-400 border border-amber-700">
+                    HOST
+                  </span>
+                </li>
+              </ul>
             )}
           </div>
 
@@ -64,7 +80,7 @@ export function LobbyPage({
                 >
                   {canStart ? 'Start Game' : `Need at least 2 players (${playerCount}/2)`}
                 </button>
-                {!canStart && playerCount < 2 && (
+                {!canStart && (
                   <p className="text-xs text-center text-gray-600">
                     Share the room code with friends to get started
                   </p>

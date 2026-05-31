@@ -6,8 +6,14 @@ import { handleWsUpgrade } from './src/ws/ConnectionManager.ts';
 const app = new Hono();
 
 app.use('*', cors({
-  origin: ['http://localhost:5173', 'https://*.vercel.app'],
+  origin: (origin) => {
+    if (!origin) return '*';
+    if (/^http:\/\/localhost:\d+$/.test(origin)) return origin;
+    if (origin.endsWith('.vercel.app')) return origin;
+    return '';
+  },
   allowMethods: ['GET', 'POST', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Upgrade', 'Connection', 'Sec-WebSocket-Key', 'Sec-WebSocket-Version'],
 }));
 
 app.get('/health', (c) => c.json({ status: 'ok' }));
@@ -42,4 +48,5 @@ app.get('/ws/:roomCode/:playerId', handleWsUpgrade);
 const port = parseInt(Deno.env.get('PORT') ?? '8000');
 console.log(`Backend listening on http://localhost:${port}`);
 
-Deno.serve({ port }, app.fetch);
+// hostname: '0.0.0.0' binds all IPv4; Deno also accepts IPv6 on dual-stack systems
+Deno.serve({ port, hostname: '0.0.0.0' }, app.fetch);

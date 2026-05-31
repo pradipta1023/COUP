@@ -20,8 +20,10 @@ function App() {
     case 'LOBBY':
       return (
         <LobbyPage
-          roomState={state.roomState}
+          roomCode={state.roomCode ?? ''}
           myPlayerId={state.playerId ?? ''}
+          myPlayerName={state.playerName ?? ''}
+          roomState={state.roomState}
           chatMessages={state.chatMessages}
           wsStatus={state.wsStatus}
           onSendMessage={sendMessage}

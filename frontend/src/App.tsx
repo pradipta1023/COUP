@@ -1,32 +1,6 @@
 import { useAppState } from './state/useAppState'
-
-// Placeholder screens — replaced in Tasks 7 & 8
-function LandingPage({ onCreateRoom, onJoinRoom, error }: {
-  onCreateRoom: (name: string) => void
-  onJoinRoom: (code: string, name: string) => void
-  error: string | null
-}) {
-  return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center">
-      <div className="text-center space-y-4">
-        <h1 className="text-5xl font-bold tracking-widest uppercase text-amber-400">Coup</h1>
-        {error && <p className="text-red-400 text-sm">{error}</p>}
-        <button
-          className="block w-full px-6 py-3 bg-amber-600 hover:bg-amber-500 rounded font-semibold"
-          onClick={() => onCreateRoom('Player')}
-        >
-          Create Game
-        </button>
-        <button
-          className="block w-full px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded font-semibold"
-          onClick={() => onJoinRoom('TEST', 'Player')}
-        >
-          Join Game
-        </button>
-      </div>
-    </div>
-  )
-}
+import { LandingPage } from './screens/LandingPage'
+import { LobbyPage } from './screens/LobbyPage'
 
 function ScreenPlaceholder({ name, wsStatus }: { name: string; wsStatus: string }) {
   return (
@@ -41,7 +15,6 @@ function ScreenPlaceholder({ name, wsStatus }: { name: string; wsStatus: string 
 
 function App() {
   const { state, createRoom, joinRoom, sendMessage, resetToLanding } = useAppState()
-  void sendMessage // will be used in Tasks 7 & 8
 
   switch (state.screen) {
     case 'LANDING':
@@ -52,19 +25,32 @@ function App() {
           error={state.error}
         />
       )
+
     case 'LOBBY':
-      return <ScreenPlaceholder name="Lobby" wsStatus={state.wsStatus} />
+      return (
+        <LobbyPage
+          roomState={state.roomState}
+          myPlayerId={state.playerId ?? ''}
+          chatMessages={state.chatMessages}
+          wsStatus={state.wsStatus}
+          onSendMessage={sendMessage}
+          onLeave={resetToLanding}
+        />
+      )
+
     case 'GAME':
       return <ScreenPlaceholder name="Game" wsStatus={state.wsStatus} />
+
     case 'END_GAME':
       return (
         <div className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center">
           <div className="text-center space-y-4">
-            <h2 className="text-3xl text-amber-400 font-bold">
-              {state.gameState?.winnerName ?? 'Someone'} wins!
+            <h2 className="text-4xl font-black text-amber-400 tracking-widest uppercase">
+              {state.gameState?.winnerName ?? 'Someone'} Wins!
             </h2>
+            <p className="text-gray-500">The coup is complete.</p>
             <button
-              className="px-6 py-3 bg-amber-600 hover:bg-amber-500 rounded font-semibold"
+              className="px-8 py-3 bg-amber-600 hover:bg-amber-500 rounded-xl font-bold tracking-wide transition-colors"
               onClick={resetToLanding}
             >
               Play Again

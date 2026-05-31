@@ -88,3 +88,7 @@ Build a fully playable, real-time multiplayer web version of *Coup* for 2–6 pl
 | Ambassador card exchange complexity | Isolate in a dedicated `resolveAmbassador` function in GameEngine; cover with unit tests |
 | Deno Deploy WebSocket support | Deno Deploy supports `Deno.upgradeWebSocket` natively — no issue |
 | Shared types import across two runtimes | Use a single `shared/types.ts`; Vite alias + Deno relative import — straightforward |
+
+
+## Status: Completed
+Implemented in 9 tasks. All tests passing (55 backend). Final commit: 0d54a6a.

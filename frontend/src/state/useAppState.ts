@@ -72,7 +72,10 @@ export function useAppState() {
       saveSession(roomCode, playerId, playerName)
       dispatch({ type: 'ENTER_LOBBY', roomCode, playerId, playerName })
     } catch (e) {
-      dispatch({ type: 'SET_ERROR', error: e instanceof Error ? e.message : 'Network error' })
+      const msg = e instanceof TypeError
+        ? 'Cannot reach server — is the backend running on port 8000?'
+        : e instanceof Error ? e.message : 'Network error'
+      dispatch({ type: 'SET_ERROR', error: msg })
     }
   }, [])
 
@@ -80,8 +83,10 @@ export function useAppState() {
     dispatch({ type: 'SET_ERROR', error: '' })
     try {
       const code = roomCode.toUpperCase().trim()
-      const check = await fetch(`${BACKEND_HTTP}/rooms/${code}`)
-      if (!check.ok) throw new Error('Room not found')
+      const check = await fetch(`${BACKEND_HTTP}/rooms/${code}`).catch(() => {
+        throw new TypeError('fetch')
+      })
+      if (!check.ok) throw new Error(check.status === 404 ? 'Room not found — check the code and try again' : 'Server error')
       const roomData = (await check.json()) as { status: string }
       if (roomData.status === 'in_game') throw new Error('Game already in progress')
 
@@ -98,7 +103,10 @@ export function useAppState() {
       saveSession(code, playerId, playerName)
       dispatch({ type: 'ENTER_LOBBY', roomCode: code, playerId, playerName })
     } catch (e) {
-      dispatch({ type: 'SET_ERROR', error: e instanceof Error ? e.message : 'Network error' })
+      const msg = e instanceof TypeError
+        ? 'Cannot reach server — is the backend running on port 8000?'
+        : e instanceof Error ? e.message : 'Network error'
+      dispatch({ type: 'SET_ERROR', error: msg })
     }
   }, [])
 

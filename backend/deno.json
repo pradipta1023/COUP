@@ -1,0 +1,19 @@
+{
+  "tasks": {
+    "start": "deno run --allow-net --allow-env main.ts",
+    "dev": "deno run --watch --allow-net --allow-env main.ts",
+    "test": "deno test --allow-net --allow-env src/"
+  },
+  "imports": {
+    "hono": "jsr:@hono/hono@^4",
+    "@shared/": "../shared/"
+  },
+  "lint": {
+    "rules": {
+      "tags": ["recommended"]
+    }
+  },
+  "fmt": {
+    "singleQuote": true
+  }
+}

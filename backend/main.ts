@@ -27,6 +27,16 @@ app.get('/rooms/:code', (c) => {
   return c.json(room.toRoomState());
 });
 
+app.post('/rooms/:code/join', async (c) => {
+  const body = await c.req.json<{ playerName: string }>();
+  if (!body?.playerName?.trim()) {
+    return c.json({ error: 'playerName is required' }, 400);
+  }
+  const result = roomManager.joinRoom(c.req.param('code'), body.playerName.trim());
+  if ('error' in result) return c.json({ error: result.error }, 409);
+  return c.json({ playerId: result.playerId }, 201);
+});
+
 app.get('/ws/:roomCode/:playerId', handleWsUpgrade);
 
 const port = parseInt(Deno.env.get('PORT') ?? '8000');

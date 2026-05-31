@@ -83,9 +83,7 @@ export function useAppState() {
     dispatch({ type: 'SET_ERROR', error: '' })
     try {
       const code = roomCode.toUpperCase().trim()
-      const check = await fetch(`${BACKEND_HTTP}/rooms/${code}`).catch(() => {
-        throw new TypeError('fetch')
-      })
+      const check = await fetch(`${BACKEND_HTTP}/rooms/${code}`)
       if (!check.ok) throw new Error(check.status === 404 ? 'Room not found — check the code and try again' : 'Server error')
       const roomData = (await check.json()) as { status: string }
       if (roomData.status === 'in_game') throw new Error('Game already in progress')

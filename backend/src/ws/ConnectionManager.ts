@@ -1,25 +1,29 @@
-import type { Context } from 'hono';
 import { roomManager } from '../rooms/RoomManager.ts';
 import { routeMessage, sendCurrentState } from './MessageRouter.ts';
 
 const RECONNECT_WINDOW_MS = 60_000;
 
-export function handleWsUpgrade(c: Context): Response {
-  const roomCode = c.req.param('roomCode').toUpperCase();
-  const playerId = c.req.param('playerId');
+/**
+ * Handle a WebSocket upgrade request directly (bypassing Hono middleware).
+ * URL pattern: /ws/:roomCode/:playerId
+ */
+export function handleWsRequest(req: Request): Response {
+  const url = new URL(req.url);
+  const parts = url.pathname.split('/').filter(Boolean);
+  const roomCode = parts[1]?.toUpperCase();
+  const playerId = parts[2];
+
+  if (!roomCode || !playerId) {
+    return new Response('Bad Request', { status: 400 });
+  }
 
   const room = roomManager.getRoom(roomCode);
-  if (!room) {
-    return c.text('Room not found', 404);
-  }
-  if (!room.hasPlayer(playerId)) {
-    return c.text('Player not in room', 403);
-  }
+  if (!room) return new Response('Room not found', { status: 404 });
+  if (!room.hasPlayer(playerId)) return new Response('Player not in room', { status: 403 });
 
-  const { socket, response } = Deno.upgradeWebSocket(c.req.raw);
+  const { socket, response } = Deno.upgradeWebSocket(req);
 
   socket.onopen = () => {
-    // Cancel any pending reconnect timer
     const timer = room.reconnectTimers.get(playerId);
     if (timer !== undefined) {
       clearTimeout(timer);
@@ -27,11 +31,8 @@ export function handleWsUpgrade(c: Context): Response {
     }
 
     room.setConnected(playerId, true, socket);
-
-    // Send current state (lobby or game) to this player
     sendCurrentState(room, playerId);
 
-    // Notify others of updated presence
     if (!room.gameState) {
       room.broadcast({ type: 'room_update', room: room.toRoomState() });
     }
@@ -45,15 +46,12 @@ export function handleWsUpgrade(c: Context): Response {
     room.setConnected(playerId, false, null);
 
     if (room.gameState) {
-      // In-game disconnect: hold the slot for reconnect window
       room.broadcastGameState();
       const timer = setTimeout(() => {
         room.reconnectTimers.delete(playerId);
-        // If game is over or room empty, leave; otherwise keep slot
       }, RECONNECT_WINDOW_MS);
       room.reconnectTimers.set(playerId, timer);
     } else {
-      // Lobby disconnect: remove player
       roomManager.leaveRoom(roomCode, playerId);
       if (roomManager.getRoom(roomCode)) {
         room.broadcast({ type: 'room_update', room: room.toRoomState() });

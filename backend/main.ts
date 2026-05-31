@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { logger } from 'hono/logger';
 import { roomManager } from './src/rooms/RoomManager.ts';
-import { handleWsUpgrade } from './src/ws/ConnectionManager.ts';
+import { handleWsRequest } from './src/ws/ConnectionManager.ts';
 
 const app = new Hono();
 
@@ -15,15 +16,11 @@ app.use(
       return '';
     },
     allowMethods: ['GET', 'POST', 'OPTIONS'],
-    allowHeaders: [
-      'Content-Type',
-      'Upgrade',
-      'Connection',
-      'Sec-WebSocket-Key',
-      'Sec-WebSocket-Version',
-    ],
+    allowHeaders: ['Content-Type'],
   }),
 );
+
+app.use(logger());
 
 app.get('/health', (c) => c.json({ status: 'ok' }));
 
@@ -55,10 +52,15 @@ app.post('/rooms/:code/join', async (c) => {
   return c.json({ playerId: result.playerId }, 201);
 });
 
-app.get('/ws/:roomCode/:playerId', handleWsUpgrade);
-
 const port = parseInt(Deno.env.get('PORT') ?? '8000');
 console.log(`Backend listening on http://localhost:${port}`);
 
-// hostname: '0.0.0.0' binds all IPv4; Deno also accepts IPv6 on dual-stack systems
-Deno.serve({ port, hostname: '0.0.0.0' }, app.fetch);
+// WebSocket upgrade requests bypass Hono entirely to avoid CORS middleware
+// corrupting the 101 Switching Protocols response.
+Deno.serve({ port, hostname: '::' }, (req) => {
+  const url = new URL(req.url);
+  if (url.pathname.startsWith('/ws/') && req.headers.get('upgrade') === 'websocket') {
+    return handleWsRequest(req);
+  }
+  return app.fetch(req);
+});

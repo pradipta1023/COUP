@@ -1,5 +1,5 @@
 import { assertEquals, assertMatch, assertNotEquals } from 'jsr:@std/assert';
-import { RoomManager } from './RoomManager.ts';
+import { RoomManager } from '../src/rooms/RoomManager.ts';
 
 function makeManager() {
   return new RoomManager();
@@ -14,7 +14,9 @@ Deno.test('createRoom returns a 6-char code and a playerId', () => {
 
 Deno.test('createRoom generates unique codes', () => {
   const mgr = makeManager();
-  const codes = new Set(Array.from({ length: 20 }, () => mgr.createRoom('x').roomCode));
+  const codes = new Set(
+    Array.from({ length: 20 }, () => mgr.createRoom('x').roomCode),
+  );
   assertEquals(codes.size, 20);
 });
 

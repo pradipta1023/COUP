@@ -8,9 +8,8 @@ import {
   declareAction,
   initGame,
   toClientGameState,
-} from './GameEngine.ts';
-import type { ServerGameState } from './types.ts';
-
+} from '../src/game/GameEngine.ts';
+import type { ServerGameState } from '../src/game/types.ts';
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 function twoPlayers() {
@@ -28,7 +27,11 @@ function threePlayers() {
   ];
 }
 
-function forceCards(state: ServerGameState, playerId: string, cards: [string, string]): ServerGameState {
+function forceCards(
+  state: ServerGameState,
+  playerId: string,
+  cards: [string, string],
+): ServerGameState {
   return {
     ...state,
     players: state.players.map((p) =>
@@ -83,7 +86,11 @@ Deno.test('income gives +1 coin and advances turn', () => {
 
 Deno.test('foreign aid opens reaction window', () => {
   const state = initGame(twoPlayers());
-  const { state: s2, needsReaction } = declareAction(state, 'p1', 'foreign_aid');
+  const { state: s2, needsReaction } = declareAction(
+    state,
+    'p1',
+    'foreign_aid',
+  );
   assertEquals(needsReaction, true);
   assertEquals(s2.turnState.phase, 'waiting_for_reactions');
   assertEquals(s2.turnState.pendingAction, 'foreign_aid');
@@ -114,7 +121,10 @@ Deno.test('foreign aid blocked by Duke cancels action', () => {
 
 Deno.test('coup costs 7 coins and puts target in reveal phase', () => {
   let state = initGame(twoPlayers());
-  state = { ...state, players: state.players.map((p) => p.id === 'p1' ? { ...p, coins: 7 } : p) };
+  state = {
+    ...state,
+    players: state.players.map((p) => p.id === 'p1' ? { ...p, coins: 7 } : p),
+  };
   const { state: s2, needsReaction } = declareAction(state, 'p1', 'coup', 'p2');
   assertEquals(needsReaction, false);
   assertEquals(s2.players.find((p) => p.id === 'p1')!.coins, 0);
@@ -129,18 +139,32 @@ Deno.test('coup with insufficient coins throws', () => {
 
 Deno.test('forced coup at 10+ coins rejects other actions', () => {
   let state = initGame(twoPlayers());
-  state = { ...state, players: state.players.map((p) => p.id === 'p1' ? { ...p, coins: 10 } : p) };
+  state = {
+    ...state,
+    players: state.players.map((p) => p.id === 'p1' ? { ...p, coins: 10 } : p),
+  };
   assertThrows(() => declareAction(state, 'p1', 'income'));
 });
 
 Deno.test('reveal after coup eliminates player with 1 card left', () => {
   let state = initGame(twoPlayers());
-  state = { ...state, players: state.players.map((p) => p.id === 'p1' ? { ...p, coins: 7 } : p) };
+  state = {
+    ...state,
+    players: state.players.map((p) => p.id === 'p1' ? { ...p, coins: 7 } : p),
+  };
   // Give p2 one already-revealed card
   state = {
     ...state,
     players: state.players.map((p) =>
-      p.id === 'p2' ? { ...p, cards: [{ name: 'Duke', revealed: true }, { name: 'Contessa', revealed: false }] } : p
+      p.id === 'p2'
+        ? {
+          ...p,
+          cards: [{ name: 'Duke', revealed: true }, {
+            name: 'Contessa',
+            revealed: false,
+          }],
+        }
+        : p
     ),
   };
   const { state: s2 } = declareAction(state, 'p1', 'coup', 'p2');
@@ -160,7 +184,6 @@ Deno.test('tax gives +3 coins when unchallenged', () => {
 
 // ─── Assassinate ──────────────────────────────────────────────────────────────
 
-
 // Redo: assassinate requires 3 coins
 Deno.test('assassinate requires 3 coins', () => {
   const state = initGame(twoPlayers()); // p1 has 2 coins
@@ -169,7 +192,10 @@ Deno.test('assassinate requires 3 coins', () => {
 
 Deno.test('assassinate resolves correctly with 3+ coins', () => {
   let state = initGame(twoPlayers());
-  state = { ...state, players: state.players.map((p) => p.id === 'p1' ? { ...p, coins: 5 } : p) };
+  state = {
+    ...state,
+    players: state.players.map((p) => p.id === 'p1' ? { ...p, coins: 5 } : p),
+  };
   state = forceCards(state, 'p1', ['Assassin', 'Duke']);
   const { state: s2 } = declareAction(state, 'p1', 'assassinate', 'p2');
   const { state: s3 } = applyPass(s2, 'p2'); // p2 doesn't block
@@ -180,7 +206,10 @@ Deno.test('assassinate resolves correctly with 3+ coins', () => {
 
 Deno.test('assassinate blocked by Contessa cancels action', () => {
   let state = initGame(twoPlayers());
-  state = { ...state, players: state.players.map((p) => p.id === 'p1' ? { ...p, coins: 5 } : p) };
+  state = {
+    ...state,
+    players: state.players.map((p) => p.id === 'p1' ? { ...p, coins: 5 } : p),
+  };
   state = forceCards(state, 'p2', ['Contessa', 'Duke']);
   const { state: s2 } = declareAction(state, 'p1', 'assassinate', 'p2');
   const { state: s3 } = applyBlock(s2, 'p2', 'Contessa');
@@ -203,7 +232,10 @@ Deno.test('steal takes up to 2 coins from target', () => {
 
 Deno.test('steal takes only available coins when target has fewer than 2', () => {
   let state = initGame(twoPlayers());
-  state = { ...state, players: state.players.map((p) => p.id === 'p2' ? { ...p, coins: 1 } : p) };
+  state = {
+    ...state,
+    players: state.players.map((p) => p.id === 'p2' ? { ...p, coins: 1 } : p),
+  };
   state = forceCards(state, 'p1', ['Captain', 'Duke']);
   const { state: s2 } = declareAction(state, 'p1', 'steal', 'p2');
   const { state: s3 } = applyPass(s2, 'p2');
@@ -213,7 +245,10 @@ Deno.test('steal takes only available coins when target has fewer than 2', () =>
 
 Deno.test('steal from player with 0 coins gives nothing', () => {
   let state = initGame(twoPlayers());
-  state = { ...state, players: state.players.map((p) => p.id === 'p2' ? { ...p, coins: 0 } : p) };
+  state = {
+    ...state,
+    players: state.players.map((p) => p.id === 'p2' ? { ...p, coins: 0 } : p),
+  };
   state = forceCards(state, 'p1', ['Captain', 'Duke']);
   const { state: s2 } = declareAction(state, 'p1', 'steal', 'p2');
   const { state: s3 } = applyPass(s2, 'p2');
@@ -238,7 +273,11 @@ Deno.test('applyExchange replaces cards and advances turn', () => {
   const { state: s2 } = declareAction(state, 'p1', 'exchange');
   const { state: s3 } = applyPass(s2, 'p2');
   const { state: s4 } = applyExchange(s3, 'p1', [0, 1]);
-  assertEquals(s4.players.find((p) => p.id === 'p1')!.cards.filter((c) => !c.revealed).length, 2);
+  assertEquals(
+    s4.players.find((p) => p.id === 'p1')!.cards.filter((c) => !c.revealed)
+      .length,
+    2,
+  );
   assertEquals(s4.turnState.currentPlayerId, 'p2');
   assertEquals(s4.turnState.phase, 'waiting_for_action');
 });
@@ -253,7 +292,10 @@ Deno.test('successful challenge (claimer lied): game enters waiting_for_reveal f
   // Game waits for p1 to choose which card to reveal
   assertEquals(s3.turnState.phase, 'waiting_for_reveal');
   assertEquals(s3.turnState.revealingPlayerId, 'p1');
-  assertEquals(events.some((e) => e.message.includes('challenge succeeds')), true);
+  assertEquals(
+    events.some((e) => e.message.includes('challenge succeeds')),
+    true,
+  );
   // After p1 reveals, turn advances (action was cancelled)
   const { state: s4 } = applyReveal(s3, 'p1', 0);
   assertEquals(s4.players.find((p) => p.id === 'p1')!.cards[0].revealed, true);
@@ -286,7 +328,10 @@ Deno.test('block challenge: block is false, game enters waiting_for_reveal then 
   // Block busted — p2 must choose which card to reveal
   assertEquals(s4.turnState.phase, 'waiting_for_reveal');
   assertEquals(s4.turnState.revealingPlayerId, 'p2');
-  assertEquals(events.some((e) => e.message.includes('challenge succeeds')), true);
+  assertEquals(
+    events.some((e) => e.message.includes('challenge succeeds')),
+    true,
+  );
   // After p2 reveals, foreign aid proceeds — p1 gets +2 coins
   const { state: s5 } = applyReveal(s4, 'p2', 0);
   assertEquals(s5.players.find((p) => p.id === 'p1')!.coins, 4);
@@ -297,12 +342,23 @@ Deno.test('block challenge: block is false, game enters waiting_for_reveal then 
 
 Deno.test('win detected when only one player remains', () => {
   let state = initGame(twoPlayers());
-  state = { ...state, players: state.players.map((p) => p.id === 'p1' ? { ...p, coins: 7 } : p) };
+  state = {
+    ...state,
+    players: state.players.map((p) => p.id === 'p1' ? { ...p, coins: 7 } : p),
+  };
   // Give p2 one card already revealed
   state = {
     ...state,
     players: state.players.map((p) =>
-      p.id === 'p2' ? { ...p, cards: [{ name: 'Duke', revealed: true }, { name: 'Captain', revealed: false }] } : p
+      p.id === 'p2'
+        ? {
+          ...p,
+          cards: [{ name: 'Duke', revealed: true }, {
+            name: 'Captain',
+            revealed: false,
+          }],
+        }
+        : p
     ),
   };
   const { state: s2 } = declareAction(state, 'p1', 'coup', 'p2');

@@ -1,5 +1,6 @@
 import { assertEquals } from 'jsr:@std/assert';
-import { routeMessage } from './MessageRouter.ts';
+import { routeMessage } from '../ws/MessageRouter.ts';
+import { ReactionWindow } from '../ws/ReactionWindow.ts';
 import { Room } from '../rooms/Room.ts';
 
 // ─── Mock socket ──────────────────────────────────────────────────────────────
@@ -55,7 +56,11 @@ Deno.test('chat trims and ignores empty messages', () => {
 
 Deno.test('chat truncates long messages to 500 chars', () => {
   const { room, p1Socket } = makeRoom();
-  routeMessage(room, 'p1', JSON.stringify({ type: 'chat', message: 'x'.repeat(600) }));
+  routeMessage(
+    room,
+    'p1',
+    JSON.stringify({ type: 'chat', message: 'x'.repeat(600) }),
+  );
   assertEquals((lastMsg(p1Socket).message as string).length, 500);
 });
 
@@ -91,9 +96,16 @@ Deno.test('income advances turn and broadcasts game_state', () => {
   routeMessage(room, 'p1', JSON.stringify({ type: 'start_game' }));
   const coinsBefore = room.gameState!.players.find((p) => p.id === 'p1')!.coins;
 
-  routeMessage(room, 'p1', JSON.stringify({ type: 'take_action', action: 'income' }));
+  routeMessage(
+    room,
+    'p1',
+    JSON.stringify({ type: 'take_action', action: 'income' }),
+  );
 
-  assertEquals(room.gameState!.players.find((p) => p.id === 'p1')!.coins, coinsBefore + 1);
+  assertEquals(
+    room.gameState!.players.find((p) => p.id === 'p1')!.coins,
+    coinsBefore + 1,
+  );
   assertEquals(lastMsg(p1Socket).type, 'game_state');
 });
 
@@ -102,7 +114,11 @@ Deno.test('action rejected when not player turn', () => {
   routeMessage(room, 'p1', JSON.stringify({ type: 'start_game' }));
 
   // p2 tries to take action when it is p1's turn
-  routeMessage(room, 'p2', JSON.stringify({ type: 'take_action', action: 'income' }));
+  routeMessage(
+    room,
+    'p2',
+    JSON.stringify({ type: 'take_action', action: 'income' }),
+  );
   assertEquals(lastMsg(p2Socket).type, 'error');
 });
 
@@ -113,11 +129,18 @@ Deno.test('foreign aid → p2 passes → p1 gets +2 coins', () => {
   routeMessage(room, 'p1', JSON.stringify({ type: 'start_game' }));
   const coinsBefore = room.gameState!.players.find((p) => p.id === 'p1')!.coins;
 
-  routeMessage(room, 'p1', JSON.stringify({ type: 'take_action', action: 'foreign_aid' }));
+  routeMessage(
+    room,
+    'p1',
+    JSON.stringify({ type: 'take_action', action: 'foreign_aid' }),
+  );
   assertEquals(room.gameState!.turnState.phase, 'waiting_for_reactions');
 
   routeMessage(room, 'p2', JSON.stringify({ type: 'pass' }));
-  assertEquals(room.gameState!.players.find((p) => p.id === 'p1')!.coins, coinsBefore + 2);
+  assertEquals(
+    room.gameState!.players.find((p) => p.id === 'p1')!.coins,
+    coinsBefore + 2,
+  );
   assertEquals(room.gameState!.turnState.currentPlayerId, 'p2');
 });
 
@@ -126,12 +149,19 @@ Deno.test('foreign aid → p2 blocks with Duke → p1 passes → action cancelle
   routeMessage(room, 'p1', JSON.stringify({ type: 'start_game' }));
   const coinsBefore = room.gameState!.players.find((p) => p.id === 'p1')!.coins;
 
-  routeMessage(room, 'p1', JSON.stringify({ type: 'take_action', action: 'foreign_aid' }));
+  routeMessage(
+    room,
+    'p1',
+    JSON.stringify({ type: 'take_action', action: 'foreign_aid' }),
+  );
   routeMessage(room, 'p2', JSON.stringify({ type: 'block', role: 'Duke' }));
   routeMessage(room, 'p1', JSON.stringify({ type: 'pass' }));
 
   // Action cancelled — p1 should not gain coins
-  assertEquals(room.gameState!.players.find((p) => p.id === 'p1')!.coins, coinsBefore);
+  assertEquals(
+    room.gameState!.players.find((p) => p.id === 'p1')!.coins,
+    coinsBefore,
+  );
   assertEquals(room.gameState!.turnState.currentPlayerId, 'p2');
 });
 
@@ -152,11 +182,12 @@ Deno.test('reaction window auto-passes and resolves after timeout', async () => 
   const coinsBefore = room.gameState!.players.find((p) => p.id === 'p1')!.coins;
 
   // Import with short timeout for testing
-  const { ReactionWindow } = await import('./ReactionWindow.ts');
   const win = new ReactionWindow();
 
   let resolved = false;
-  win.start(() => { resolved = true; }, 20);
+  win.start(() => {
+    resolved = true;
+  }, 20);
 
   await new Promise((r) => setTimeout(r, 50));
   assertEquals(resolved, true);
@@ -166,5 +197,8 @@ Deno.test('reaction window auto-passes and resolves after timeout', async () => 
   assertEquals(win.isActive, false);
 
   // Coins should still be coinsBefore since we didn't run through router here
-  assertEquals(room.gameState!.players.find((p) => p.id === 'p1')!.coins, coinsBefore);
+  assertEquals(
+    room.gameState!.players.find((p) => p.id === 'p1')!.coins,
+    coinsBefore,
+  );
 });
